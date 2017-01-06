@@ -1,6 +1,4 @@
-/* globals _ window */
-
-import Immutable from 'immutable';
+/* globals window */
 
 // Shim requestIdleCallback [source](https://developers.google.com/web/updates/2015/08/using-requestidlecallback)
 window.requestIdleCallback =
@@ -27,11 +25,11 @@ const ERROR_MISSING_STORE = 'Missing storing method';
 const SUPPORTS_NOW = window.performance && window.performance.now;
 const SUPPORTS_TIMING = window.performance && window.performance.mark;
 
-let runningMeasures = Immutable.List();
-let measureTargetDurations = Immutable.Map(); // the optional expected duration of a measure
-let storedMeasures = Immutable.List();
+const runningMeasures = {};
+const measureTargetDurations = {}; // stores optional expected durations
+let storedMeasures = [];
 // stopMetric will deal with Now measures in a different way compared to Timing measures
-if (!SUPPORTS_TIMING) storedMeasures = Immutable.Map();
+if (!SUPPORTS_TIMING) storedMeasures = {};
 // this is the method used to save the store must be set with chronos.setStoreMethod
 let storingMethod;
 let _isRequestIdleCallbackScheduled = false;
@@ -49,10 +47,10 @@ const chronos = {
    */
   startMetric(name, targetDuration = false) {
     if (!SUPPORTS_NOW) return false; // Silently fail if high resolution timing is not supported
-    if (runningMeasures.includes(name)) throw new Error(`metric ${name} is already running`);
-    runningMeasures = runningMeasures.push(name);
+    if (runningMeasures[name]) throw new Error(`metric ${name} is already running`);
+    runningMeasures[name] = name;
     if (targetDuration) {
-      measureTargetDurations = measureTargetDurations.set(name, targetDuration);
+      measureTargetDurations[name] = targetDuration;
     }
 
     if (SUPPORTS_TIMING) {
@@ -62,11 +60,7 @@ const chronos = {
 
     // fallback if User Timing API is not supported
     const startTime = window.performance.now();
-    storedMeasures = storedMeasures.set(name, Immutable.fromJS({
-      name,
-      startTime
-    }));
-
+    storedMeasures[name] = { name, startTime };
 
     return true;
   },
@@ -77,25 +71,22 @@ const chronos = {
    */
   stopMetric(name) {
     if (!SUPPORTS_NOW) return false; // Silently fail if high resolution timing is not supported
-    const metricIndex = runningMeasures.indexOf(name);
-    if (metricIndex === -1) throw new Error(`metric ${name} is not running`);
-    runningMeasures = runningMeasures.remove(metricIndex);
+    if (!runningMeasures[name]) throw new Error(`metric ${name} is not running`);
+    delete runningMeasures[name];
 
     if (SUPPORTS_TIMING) {
-      storedMeasures = storedMeasures.push(name);
+      storedMeasures.push(name);
       window.performance.mark(`${name}_end`);
       return true;
     }
 
     // fallback if User Timing API is not supported
     const endTime = window.performance.now();
-    storedMeasures = storedMeasures.update(name, (m) => {
-      const duration = endTime - m.get('startTime');
-      const targetDuration = measureTargetDurations.get(name);
-      m = m.set('duration', duration);
-      if (targetDuration) m = m.set('target_duration', targetDuration);
-      return m;
-    });
+    const targetDuration = measureTargetDurations[name] || false;
+    const measure = storedMeasures[name];
+    measure.duration = endTime - measure.startTime;
+    if (targetDuration) measure.targetDuration = targetDuration;
+    Object.assign(storedMeasures[name], measure);
 
     return true;
   },
@@ -121,12 +112,14 @@ const chronos = {
 };
 
 // some private methods
-function _popCompletedMetricName () {
-  var measure = storedMeasures.last();
-  if (typeof storedMeasures.pop !== 'undefined') {
-    storedMeasures = storedMeasures.pop();
+function _popCompletedMetric () {
+  let measure;
+  if (typeof storedMeasures.pop === 'function') {
+    measure = storedMeasures.pop();
   } else {
-    storedMeasures = storedMeasures.remove(measure.get('name'));
+    const key = Object.keys(storedMeasures).pop();
+    measure = storedMeasures[key];
+    delete storedMeasures[key];
   }
   return measure;
 }
@@ -145,21 +138,25 @@ function _processAndSendTimingMeasures (deadline) {
 
   const prepareTimingMeasure = (m) => {
     // No need to store the entryType
-    m = _.omit(m.toJSON(), 'entryType');
-    const targetDuration = measureTargetDurations.get(m.name);
-    if (targetDuration) m.target_duration = targetDuration;
-    _store(m);
+    const measure = {
+      name: m.name,
+      start_time: m.startTime,
+      duration: m.duration,
+    };
+    const targetDuration = measureTargetDurations[m.name];
+    if (targetDuration) measure.target_duration = targetDuration;
+    _store(measure);
   };
 
-  while (deadline.timeRemaining() > 0 && storedMeasures.size > 0) {
-    const metricName = _popCompletedMetricName();
+  while (deadline.timeRemaining() > 0 && storedMeasures.length > 0) {
+    const metricName = _popCompletedMetric();
     window.performance.measure(metricName, `${metricName}_start`, `${metricName}_end`);
     const metrics = window.performance.getEntriesByName(metricName);
     metrics.forEach(prepareTimingMeasure);
   }
 
   window.performance.clearMeasures();
-  if (storedMeasures.size > 0) {
+  if (storedMeasures.length === 0) {
     _processAndSendMetrics();
   } else {
     window.performance.clearMarks();
@@ -170,16 +167,14 @@ function _processAndSendTimingMeasures (deadline) {
 function _processAndSendMeasures (deadline) {
   _isRequestIdleCallbackScheduled = false;
 
-  while (deadline.timeRemaining() > 0 && storedMeasures.size > 0) {
-    const measure = _popCompletedMetricName();
-    if (measure) _store(measure.toJSON());
+  while (deadline.timeRemaining() > 0 && Object.keys(storedMeasures).length > 0) {
+    const measure = _popCompletedMetric();
+    if (measure) _store(measure);
   }
 
   window.performance.clearMeasures();
-  if (storedMeasures.size > 0) {
+  if (Object.keys(storedMeasures).length > 0) {
     _processAndSendMetrics();
-  } else {
-    storedMeasures = storedMeasures.clear();
   }
 }
 

@@ -18,14 +18,10 @@
     "type": "git",
     "url": "git+https://github.com/bufferapp/chronos.git"
   },
-  "author": "Federico Weber <federicoweber+github@gmail.com> ",
-  "license": "UNLICENSED",
+  "author": "Federico Weber <federicoweber+github@gmail.com>",
+  "license": "MIT",
   "bugs": {
     "url": "https://github.com/bufferapp/chronos/issues"
   },
   "homepage": "https://github.com/bufferapp/chronos#readme",
-  "dependencies": {
-    "immutable": "3.7.6",
-    "underscore": "1.8.3"
-  }
 }
