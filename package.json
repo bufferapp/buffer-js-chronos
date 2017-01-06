@@ -1,0 +1,31 @@
+{
+  "name": "@bufferapp/chronos",
+  "version": "0.1.0",
+  "description": "A small library to handle browser timining measures",
+  "main": "./src/chronos.js",
+  "keywords": [
+    "analytics",
+    "measure",
+    "measurement",
+    "metrics",
+    "reporting",
+    "timing"
+  ],
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bufferapp/chronos.git"
+  },
+  "author": "Federico Weber <federicoweber+github@gmail.com> ",
+  "license": "UNLICENSED",
+  "bugs": {
+    "url": "https://github.com/bufferapp/chronos/issues"
+  },
+  "homepage": "https://github.com/bufferapp/chronos#readme",
+  "dependencies": {
+    "immutable": "3.7.6",
+    "underscore": "1.8.3"
+  }
+}
