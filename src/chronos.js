@@ -35,10 +35,6 @@ let storingMethod;
 let _isRequestIdleCallbackScheduled = false;
 
 const chronos = {
-  getRunningMetrics() {
-    return runningMeasures.toArray();
-  },
-
   /**
    * Start a new measure with the provided name
    * @param  name String
