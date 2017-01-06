@@ -1,8 +1,8 @@
 {
   "name": "@bufferapp/chronos",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A small library to handle browser timining measures",
-  "main": "./src/chronos.js",
+  "main": "./lib/chronos.js",
   "keywords": [
     "analytics",
     "measure",
