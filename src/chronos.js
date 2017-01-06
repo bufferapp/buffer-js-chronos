@@ -43,7 +43,6 @@ const chronos = {
    */
   startMeasure(name, targetDuration = false) {
     if (!SUPPORTS_NOW) return false; // Silently fail if high resolution timing is not supported
-    if (runningMeasures[name]) throw new Error(`metric ${name} is already running`);
     runningMeasures[name] = name;
     if (targetDuration) {
       measureTargetDurations[name] = targetDuration;
@@ -67,7 +66,7 @@ const chronos = {
    */
   stopMeasure(name) {
     if (!SUPPORTS_NOW) return false; // Silently fail if high resolution timing is not supported
-    if (!runningMeasures[name]) throw new Error(`metric ${name} is not running`);
+    if (!runningMeasures[name]) return false; // To ease usage we do not throw an error in this case
     delete runningMeasures[name];
 
     if (SUPPORTS_TIMING) {
