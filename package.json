@@ -22,9 +22,9 @@
   "author": "Federico Weber <federicoweber+github@gmail.com>",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/bufferapp/chronos/issues"
+    "url": "https://github.com/bufferapp/buffer-js-chronos/issues"
   },
-  "homepage": "https://github.com/bufferapp/chronos#readme",
+  "homepage": "https://github.com/bufferapp/buffer-js-chronos#readme",
   "devDependencies": {
     "babel-cli": "6.18.0",
     "babel-core": "6.18.2",
