@@ -1,6 +1,6 @@
 {
   "name": "@bufferapp/chronos",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A small library to handle browser timining measures",
   "main": "./src/chronos.js",
   "keywords": [
@@ -12,7 +12,8 @@
     "timing"
   ],
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "compile": "rimraf lib/* && babel src -d lib",
+    "prepublish": "npm run compile"
   },
   "repository": {
     "type": "git",
@@ -24,4 +25,11 @@
     "url": "https://github.com/bufferapp/chronos/issues"
   },
   "homepage": "https://github.com/bufferapp/chronos#readme",
+  "devDependencies": {
+    "babel-cli": "6.18.0",
+    "babel-core": "6.18.2",
+    "babel-preset-es2015": "6.18.0",
+    "babel-preset-stage-0": "6.16.0",
+    "rimraf": "2.5.4"
+  }
 }

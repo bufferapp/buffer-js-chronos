@@ -45,7 +45,7 @@ const chronos = {
    * @param  targetDuration Float, this is an optional parameter
    /*        useful to understand how the measure is performing
    */
-  startMetric(name, targetDuration = false) {
+  startMeasure(name, targetDuration = false) {
     if (!SUPPORTS_NOW) return false; // Silently fail if high resolution timing is not supported
     if (runningMeasures[name]) throw new Error(`metric ${name} is already running`);
     runningMeasures[name] = name;
@@ -69,7 +69,7 @@ const chronos = {
    * Stop a running measure with the provided name
    * @param  {string} name
    */
-  stopMetric(name) {
+  stopMeasure(name) {
     if (!SUPPORTS_NOW) return false; // Silently fail if high resolution timing is not supported
     if (!runningMeasures[name]) throw new Error(`metric ${name} is not running`);
     delete runningMeasures[name];
