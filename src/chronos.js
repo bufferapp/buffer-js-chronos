@@ -164,7 +164,12 @@ function _processAndSendMeasures (deadline) {
 
   while (deadline.timeRemaining() > 0 && Object.keys(storedMeasures).length > 0) {
     const measure = _popCompletedMetric();
-    if (measure) _store(measure);
+    if (measure) _store({
+      name: measure.name,
+      start_time: measure.startTime,
+      duration: measure.duration,
+      target_duration: measure.targetDuration
+    });
   }
 
   window.performance.clearMeasures();
