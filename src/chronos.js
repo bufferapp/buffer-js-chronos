@@ -25,6 +25,7 @@ const ERROR_MISSING_STORE = 'Missing storing method';
 const SUPPORTS_NOW = window.performance && window.performance.now;
 const SUPPORTS_TIMING = window.performance && window.performance.mark;
 
+const runningMeasureKeys = {};
 const runningMeasures = {};
 const measureTargetDurations = {}; // stores optional expected durations
 let storedMeasures = [];
@@ -43,7 +44,7 @@ const chronos = {
    */
   startMeasure(name, targetDuration = false) {
     if (!SUPPORTS_NOW) return false; // Silently fail if high resolution timing is not supported
-    runningMeasures[name] = name;
+    runningMeasureKeys[name] = name;
     if (targetDuration) {
       measureTargetDurations[name] = targetDuration;
     }
@@ -55,7 +56,7 @@ const chronos = {
 
     // fallback if User Timing API is not supported
     const startTime = window.performance.now();
-    storedMeasures[name] = { name, startTime };
+    runningMeasures[name] = { name, startTime };
 
     return true;
   },
@@ -66,8 +67,8 @@ const chronos = {
    */
   stopMeasure(name) {
     if (!SUPPORTS_NOW) return false; // Silently fail if high resolution timing is not supported
-    if (!runningMeasures[name]) return false; // To ease usage we do not throw an error in this case
-    delete runningMeasures[name];
+    if (!runningMeasureKeys[name]) return false; // To ease usage we do not throw an error in this case
+    delete runningMeasureKeys[name];
 
     if (SUPPORTS_TIMING) {
       storedMeasures.push(name);
@@ -78,10 +79,10 @@ const chronos = {
     // fallback if User Timing API is not supported
     const endTime = window.performance.now();
     const targetDuration = measureTargetDurations[name] || false;
-    const measure = storedMeasures[name];
+    const measure = runningMeasures[name];
     measure.duration = endTime - measure.startTime;
     if (targetDuration) measure.targetDuration = targetDuration;
-    Object.assign(storedMeasures[name], measure);
+    storedMeasures[name] = measure;
 
     return true;
   },
@@ -150,11 +151,11 @@ function _processAndSendTimingMeasures (deadline) {
     metrics.forEach(prepareTimingMeasure);
   }
 
-  window.performance.clearMeasures();
-  if (storedMeasures.length === 0) {
+  if (storedMeasures.length > 0) {
     _processAndSendMetrics();
-  } else {
+  } else if(Object.keys(runningMeasureKeys).length === 0) {
     window.performance.clearMarks();
+    window.performance.clearMeasures();
   }
 }
 
@@ -172,7 +173,6 @@ function _processAndSendMeasures (deadline) {
     });
   }
 
-  window.performance.clearMeasures();
   if (Object.keys(storedMeasures).length > 0) {
     _processAndSendMetrics();
   }
