@@ -178,7 +178,7 @@ function _store(data) {
 function _processAndSendTimingMeasures (deadline) {
   _isRequestIdleCallbackScheduled = false;
 
-  const prepareTimingMeasure = (m) => {
+  const storeTimingMeasure = (m) => {
     // No need to store the entryType
     const measure = {
       name: m.name,
@@ -194,14 +194,14 @@ function _processAndSendTimingMeasures (deadline) {
     const metricName = _popCompletedMetric();
     window.performance.measure(metricName, `${metricName}_start`, `${metricName}_end`);
     const metrics = window.performance.getEntriesByName(metricName);
-    metrics.forEach(prepareTimingMeasure);
+    metrics.forEach(storeTimingMeasure);
   }
 
   _processAndSendSpecialMeasures(deadline);
 
   if (storedMeasures.length > 0) {
     _processAndSendMetrics();
-  } else if(Object.keys(runningMeasureKeys).length === 0) {
+  } else if(Object.keys(runningMeasureKeys).length === 0 && storedMeasures.length === 0) {
     window.performance.clearMarks();
     window.performance.clearMeasures();
   }
