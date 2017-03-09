@@ -225,7 +225,7 @@ function _processAndSendTimingMeasures (deadline) {
 
   _processAndSendSpecialMeasures(deadline);
 
-  if (storedMeasures.length > 0) {
+  if (storedMeasures.length > 0 ||  Object.keys(specialMeasures).length > 0) {
     _processAndSendMetrics();
   } else if(Object.keys(runningMeasureKeys).length === 0 && storedMeasures.length === 0) {
     if (isDebugMode) console.log(`Chronos cleanup marks and measures`);
@@ -251,7 +251,7 @@ function _processAndSendMeasures (deadline) {
 
   _processAndSendSpecialMeasures(deadline);
 
-  if (Object.keys(storedMeasures).length > 0) {
+  if (Object.keys(storedMeasures).length > 0 ||  Object.keys(specialMeasures).length > 0) {
     _processAndSendMetrics();
   }
 }
