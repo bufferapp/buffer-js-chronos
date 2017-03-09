@@ -24,6 +24,7 @@ window.cancelIdleCallback =
 const ERROR_MISSING_STORE = 'Missing storing method';
 const SUPPORTS_NOW = window.performance && window.performance.now;
 const SUPPORTS_TIMING = window.performance && window.performance.mark;
+const NAVIGATION_START = window.performance.timing.navigationStart;
 
 const runningMeasureKeys = {};
 const runningMeasures = {};
@@ -79,12 +80,14 @@ const chronos = {
     
     const startTime = window.performance.timing[eventName];
     if (!startTime) return false;
-    const duration = startTime - window.performance.now();
+    const timeFromNavigationStart = startTime - NAVIGATION_START;
+    const duration = window.performance.now() - timeFromNavigationStart;
     const measure = { 
-      name,
       duration,
-      start_time: startTime,
-      event_name: eventName
+      event_name: eventName,
+      name,
+      navigation_start: NAVIGATION_START,
+      start_time: NAVIGATION_START - startTime
     };
     if (targetDuration) measure.target_duration = targetDuration;
     specialMeasures[name] = measure;
@@ -160,15 +163,15 @@ const chronos = {
   setDebugMode(status) {
     isDebugMode = status;
     if (isDebugMode) {
-      this._runningMeasures = runningMeasures;
-      this._storedMeasures = storedMeasures;
       this._runningMeasureKeys = runningMeasureKeys;
+      this._runningMeasures = runningMeasures;
       this._specialMeasures = specialMeasures;
+      this._storedMeasures = storedMeasures;
     } else {
-      delete this._runningMeasures;
-      delete this._storedMeasures;
       delete this._runningMeasureKeys;
+      delete this._runningMeasures;
       delete this._specialMeasures;
+      delete this._storedMeasures;
     }
   }
 };
@@ -206,9 +209,10 @@ function _processAndSendTimingMeasures (deadline) {
   const storeTimingMeasure = (m) => {
     // No need to store the entryType
     const measure = {
-      name: m.name,
-      start_time: m.startTime,
       duration: m.duration,
+      name: m.name,
+      navigation_start: NAVIGATION_START,
+      start_time: m.startTime
     };
     const targetDuration = measureTargetDurations[m.name];
     if (targetDuration) measure.target_duration = targetDuration;
@@ -241,9 +245,10 @@ function _processAndSendMeasures (deadline) {
   while (deadline.timeRemaining() > 0 && Object.keys(storedMeasures).length > 0) {
     const measure = _popCompletedMetric();
     if (measure) _store({
-      name: measure.name,
-      start_time: measure.startTime,
       duration: measure.duration,
+      name: measure.name,
+      navigation_start: NAVIGATION_START,
+      start_time: measure.startTime,
       target_duration: measure.targetDuration
     });
     if (isDebugMode) console.log(`Chronos StoreMeasure ${measure.name}`);
