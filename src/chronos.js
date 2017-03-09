@@ -28,6 +28,7 @@ const SUPPORTS_TIMING = window.performance && window.performance.mark;
 const runningMeasureKeys = {};
 const runningMeasures = {};
 const measureTargetDurations = {}; // stores optional expected durations
+let isDebugMode = false;
 let specialMeasures = {}; // thisis used to track measures that start from special markers (es. navigationStart)
 let storedMeasures = [];
 // stopMetric will deal with Now measures in a different way compared to Timing measures
@@ -44,6 +45,8 @@ const chronos = {
    /*        useful to understand how the measure is performing
    */
   startMeasure(name, targetDuration = false) {
+    if (isDebugMode) console.log(`Chronos startMeasure ${name}`);
+
     if (!SUPPORTS_NOW) return false; // Silently fail if high resolution timing is not supported
     runningMeasureKeys[name] = name;
     if (targetDuration) {
@@ -71,6 +74,7 @@ const chronos = {
    */
   measureFromSpecialEvent(name, eventName, targetDuration = false) {
     if (!eventName) return false;
+    if (isDebugMode) console.log(`Chronos measureFromSpecialEvent ${name}`);
     if (!SUPPORTS_NOW) return false; // Silently fail if high resolution timing is not supported
     
     const startTime = window.performance.timing[eventName];
@@ -97,6 +101,7 @@ const chronos = {
   measureFromNavigationStart(name, targetDuration = false) {
     if (!SUPPORTS_NOW) return false; // Silently fail if high resolution timing is not supported
     
+    if (isDebugMode) console.log(`Chronos measureFromNavigationStart ${name}`);
     this.measureFromSpecialEvent(name, 'navigationStart', targetDuration);
     
     return true;
@@ -111,6 +116,7 @@ const chronos = {
     if (!runningMeasureKeys[name]) return false; // To ease usage we do not throw an error in this case
     delete runningMeasureKeys[name];
 
+    if (isDebugMode) console.log(`Chronos stopMeasure ${name}`);
     if (SUPPORTS_TIMING) {
       storedMeasures.push(name);
       window.performance.mark(`${name}_end`);
@@ -144,6 +150,25 @@ const chronos = {
       _processAndSendMetrics();
     } else {
       throw new Error(ERROR_MISSING_STORE);
+    }
+  },
+
+  /**
+   * set Debug mode
+   * @param  {boolean} status
+   */
+  setDebugMode(status) {
+    isDebugMode = status;
+    if (isDebugMode) {
+      this._runningMeasures = runningMeasures;
+      this._storedMeasures = storedMeasures;
+      this._runningMeasureKeys = runningMeasureKeys;
+      this._specialMeasures = specialMeasures;
+    } else {
+      delete this._runningMeasures;
+      delete this._storedMeasures;
+      delete this._runningMeasureKeys;
+      delete this._specialMeasures;
     }
   }
 };
@@ -187,6 +212,7 @@ function _processAndSendTimingMeasures (deadline) {
     };
     const targetDuration = measureTargetDurations[m.name];
     if (targetDuration) measure.target_duration = targetDuration;
+    if (isDebugMode) console.log(`Chronos StoreTimingMeasure ${m.name}`);
     _store(measure);
   };
 
@@ -202,6 +228,7 @@ function _processAndSendTimingMeasures (deadline) {
   if (storedMeasures.length > 0) {
     _processAndSendMetrics();
   } else if(Object.keys(runningMeasureKeys).length === 0 && storedMeasures.length === 0) {
+    if (isDebugMode) console.log(`Chronos cleanup marks and measures`);
     window.performance.clearMarks();
     window.performance.clearMeasures();
   }
@@ -219,6 +246,7 @@ function _processAndSendMeasures (deadline) {
       duration: measure.duration,
       target_duration: measure.targetDuration
     });
+    if (isDebugMode) console.log(`Chronos StoreMeasure ${measure.name}`);
   }
 
   _processAndSendSpecialMeasures(deadline);
@@ -232,6 +260,7 @@ function _processAndSendMeasures (deadline) {
 function _processAndSendSpecialMeasures (deadline) {
   while (deadline.timeRemaining() > 0 && Object.keys(specialMeasures).length > 0) {
     let measure = _popFromObject(specialMeasures);
+    if (isDebugMode) console.log(`Chronos StoreSpecialMeasure ${measure.name}`);
     _store(measure);
   }
 
