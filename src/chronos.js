@@ -28,6 +28,7 @@ const SUPPORTS_TIMING = window.performance && window.performance.mark;
 const runningMeasureKeys = {};
 const runningMeasures = {};
 const measureTargetDurations = {}; // stores optional expected durations
+let specialMeasures = {}; // thisis used to track measures that start from special markers (es. navigationStart)
 let storedMeasures = [];
 // stopMetric will deal with Now measures in a different way compared to Timing measures
 if (!SUPPORTS_TIMING) storedMeasures = {};
@@ -58,6 +59,46 @@ const chronos = {
     const startTime = window.performance.now();
     runningMeasures[name] = { name, startTime };
 
+    return true;
+  },
+
+  /**
+   * Create a new measure starting from an existing performance event
+   * @param  name String
+   * @param  eventName String
+   * @param  targetDuration Float, this is an optional parameter
+   /*        useful to understand how the measure is performing
+   */
+  measureFromSpecialEvent(name, eventName, targetDuration = false) {
+    if (!eventName) return false;
+    if (!SUPPORTS_NOW) return false; // Silently fail if high resolution timing is not supported
+    
+    const startTime = window.performance.timing[eventName];
+    if (!startTime) return false;
+    const duration = startTime - window.performance.now();
+    const measure = { 
+      name,
+      duration,
+      start_time: startTime,
+      event_name: eventName
+    };
+    if (targetDuration) measure.target_duration = targetDuration;
+    specialMeasures[name] = measure;
+
+    return true;
+  },
+
+  /**
+   * Create a new measure starting from the NavigationStart event
+   * @param  name String
+   * @param  targetDuration Float, this is an optional parameter
+   /*        useful to understand how the measure is performing
+   */
+  measureFromNavigationStart(name, targetDuration = false) {
+    if (!SUPPORTS_NOW) return false; // Silently fail if high resolution timing is not supported
+    
+    this.measureFromSpecialEvent(name, 'navigationStart', targetDuration);
+    
     return true;
   },
 
@@ -107,15 +148,20 @@ const chronos = {
   }
 };
 
+function _popFromObject (obj) {
+    const key = Object.keys(obj).pop();
+    let measure = obj[key];
+    delete obj[key];
+    return measure;
+}
+
 // some private methods
 function _popCompletedMetric () {
   let measure;
   if (typeof storedMeasures.pop === 'function') {
     measure = storedMeasures.pop();
   } else {
-    const key = Object.keys(storedMeasures).pop();
-    measure = storedMeasures[key];
-    delete storedMeasures[key];
+    measure = _popFromObject(storedMeasures);
   }
   return measure;
 }
@@ -151,6 +197,8 @@ function _processAndSendTimingMeasures (deadline) {
     metrics.forEach(prepareTimingMeasure);
   }
 
+  _processAndSendSpecialMeasures(deadline);
+
   if (storedMeasures.length > 0) {
     _processAndSendMetrics();
   } else if(Object.keys(runningMeasureKeys).length === 0) {
@@ -173,9 +221,20 @@ function _processAndSendMeasures (deadline) {
     });
   }
 
+  _processAndSendSpecialMeasures(deadline);
+
   if (Object.keys(storedMeasures).length > 0) {
     _processAndSendMetrics();
   }
+}
+
+// Process special measure, ex measureFromNavigationStart
+function _processAndSendSpecialMeasures (deadline) {
+  while (deadline.timeRemaining() > 0 && Object.keys(specialMeasures).length > 0) {
+    let measure = _popFromObject(specialMeasures);
+    _store(measure);
+  }
+
 }
 
 function _processAndSendMetrics () {
