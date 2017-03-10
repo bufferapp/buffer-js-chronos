@@ -45,7 +45,8 @@ const chronos = {
    * @param  targetDuration Float, this is an optional parameter
    /*        useful to understand how the measure is performing
    */
-  startMeasure(name, targetDuration = false) {
+  startMeasure({ name, targetDuration = false }) {
+    if (typeof arguments[0] === 'string') name = arguments[0];
     if (isDebugMode) console.log(`Chronos startMeasure ${name}`);
 
     if (!SUPPORTS_NOW) return false; // Silently fail if high resolution timing is not supported
@@ -73,7 +74,7 @@ const chronos = {
    * @param  targetDuration Float, this is an optional parameter
    /*        useful to understand how the measure is performing
    */
-  measureFromSpecialEvent(name, eventName, targetDuration = false) {
+  measureFromSpecialEvent({ name, eventName, targetDuration = false }) {
     if (!eventName) return false;
     if (isDebugMode) console.log(`Chronos measureFromSpecialEvent ${name}`);
     if (!SUPPORTS_NOW) return false; // Silently fail if high resolution timing is not supported
@@ -101,12 +102,17 @@ const chronos = {
    * @param  targetDuration Float, this is an optional parameter
    /*        useful to understand how the measure is performing
    */
-  measureFromNavigationStart(name, targetDuration = false) {
+  measureFromNavigationStart({ name, targetDuration = false }) {
+    if (typeof arguments[0] === 'string') name = arguments[0];
     if (!SUPPORTS_NOW) return false; // Silently fail if high resolution timing is not supported
-    
+
     if (isDebugMode) console.log(`Chronos measureFromNavigationStart ${name}`);
-    this.measureFromSpecialEvent(name, 'navigationStart', targetDuration);
-    
+    this.measureFromSpecialEvent({
+      name,
+      eventName: 'navigationStart',
+      targetDuration
+    });
+
     return true;
   },
 
