@@ -29,6 +29,7 @@ const NAVIGATION_START = window.performance.timing.navigationStart;
 const runningMeasureKeys = {};
 const runningMeasures = {};
 const measureTargetDurations = {}; // stores optional expected durations
+const extraData = {}; // stores optionals data, this are passed down to the store as individual fields
 let isDebugMode = false;
 let specialMeasures = {}; // thisis used to track measures that start from special markers (es. navigationStart)
 let storedMeasures = [];
@@ -42,18 +43,15 @@ const chronos = {
   /**
    * Start a new measure with the provided name
    * @param  name String
-   * @param  targetDuration Float, this is an optional parameter
-   /*        useful to understand how the measure is performing
-   */
-  startMeasure({ name, targetDuration = false }) {
+   * @param  data Object, any additional data you whish to store with the measure
+  **/
+  startMeasure({ name, data = false }) {
     if (typeof arguments[0] === 'string') name = arguments[0];
     if (isDebugMode) console.log(`Chronos startMeasure ${name}`);
 
     if (!SUPPORTS_NOW) return false; // Silently fail if high resolution timing is not supported
     runningMeasureKeys[name] = name;
-    if (targetDuration) {
-      measureTargetDurations[name] = targetDuration;
-    }
+    if (data) extraData[name] = data;
 
     if (SUPPORTS_TIMING) {
       window.performance.mark(`${name}_start`);
@@ -64,6 +62,7 @@ const chronos = {
     const startTime = window.performance.now();
     runningMeasures[name] = { name, startTime };
 
+
     return true;
   },
 
@@ -71,27 +70,28 @@ const chronos = {
    * Create a new measure starting from an existing performance event
    * @param  name String
    * @param  eventName String
-   * @param  targetDuration Float, this is an optional parameter
-   /*        useful to understand how the measure is performing
-   */
-  measureFromSpecialEvent({ name, eventName, targetDuration = false }) {
+   * @param  data Object, any additional data you whish to store with the measure
+  **/
+  measureFromSpecialEvent({ name, eventName, data = false }) {
     if (!eventName) return false;
     if (isDebugMode) console.log(`Chronos measureFromSpecialEvent ${name}`);
     if (!SUPPORTS_NOW) return false; // Silently fail if high resolution timing is not supported
-    
+
     const startTime = window.performance.timing[eventName];
     if (!startTime) return false;
     const timeFromNavigationStart = startTime - NAVIGATION_START;
     const duration = window.performance.now() - timeFromNavigationStart;
-    const measure = { 
+    const measure = {
       duration,
       event_name: eventName,
       name,
       navigation_start: NAVIGATION_START,
       start_time: NAVIGATION_START - startTime
     };
-    if (targetDuration) measure.target_duration = targetDuration;
     specialMeasures[name] = measure;
+
+    // store extra data
+    if (data) extraData[name] = data;
 
     return true;
   },
@@ -99,10 +99,9 @@ const chronos = {
   /**
    * Create a new measure starting from the NavigationStart event
    * @param  name String
-   * @param  targetDuration Float, this is an optional parameter
-   /*        useful to understand how the measure is performing
-   */
-  measureFromNavigationStart({ name, targetDuration = false }) {
+   * @param  data Object, any additional data you whish to store with the measure
+  **/
+  measureFromNavigationStart({ name, data = false }) {
     if (typeof arguments[0] === 'string') name = arguments[0];
     if (!SUPPORTS_NOW) return false; // Silently fail if high resolution timing is not supported
 
@@ -110,7 +109,7 @@ const chronos = {
     this.measureFromSpecialEvent({
       name,
       eventName: 'navigationStart',
-      targetDuration
+      data
     });
 
     return true;
@@ -134,10 +133,8 @@ const chronos = {
 
     // fallback if User Timing API is not supported
     const endTime = window.performance.now();
-    const targetDuration = measureTargetDurations[name] || false;
     const measure = runningMeasures[name];
     measure.duration = endTime - measure.startTime;
-    if (targetDuration) measure.targetDuration = targetDuration;
     storedMeasures[name] = measure;
 
     return true;
@@ -173,11 +170,13 @@ const chronos = {
       this._runningMeasures = runningMeasures;
       this._specialMeasures = specialMeasures;
       this._storedMeasures = storedMeasures;
+      this._extraData = extraData;
     } else {
       delete this._runningMeasureKeys;
       delete this._runningMeasures;
       delete this._specialMeasures;
       delete this._storedMeasures;
+      delete this._extraData;
     }
   }
 };
@@ -214,14 +213,17 @@ function _processAndSendTimingMeasures (deadline) {
 
   const storeTimingMeasure = (m) => {
     // No need to store the entryType
-    const measure = {
+    let measure = {
       duration: m.duration,
       name: m.name,
       navigation_start: NAVIGATION_START,
       start_time: m.startTime
     };
-    const targetDuration = measureTargetDurations[m.name];
-    if (targetDuration) measure.target_duration = targetDuration;
+    const data = extraData[measure.name];
+    if (data) {
+      measure = Object.assign(measure, data);
+      delete extraData[measure.name];
+    }
     if (isDebugMode) console.log(`Chronos StoreTimingMeasure ${m.name}`);
     _store(measure);
   };
@@ -249,15 +251,20 @@ function _processAndSendMeasures (deadline) {
   _isRequestIdleCallbackScheduled = false;
 
   while (deadline.timeRemaining() > 0 && Object.keys(storedMeasures).length > 0) {
-    const measure = _popCompletedMetric();
-    if (measure) _store({
-      duration: measure.duration,
-      name: measure.name,
+    const measureData = _popCompletedMetric();
+    let measure = {
+      duration: measureData.duration,
+      name: measureData.name,
       navigation_start: NAVIGATION_START,
-      start_time: measure.startTime,
-      target_duration: measure.targetDuration
-    });
+      start_time: measureData.startTime,
+    };
+    const data = extraData[measure.name];
+    if (data) {
+      measure = Object.assign(measure, data);
+      delete extraData[measure.name];
+    }
     if (isDebugMode) console.log(`Chronos StoreMeasure ${measure.name}`);
+    _store(measure);
   }
 
   _processAndSendSpecialMeasures(deadline);
@@ -271,6 +278,11 @@ function _processAndSendMeasures (deadline) {
 function _processAndSendSpecialMeasures (deadline) {
   while (deadline.timeRemaining() > 0 && Object.keys(specialMeasures).length > 0) {
     let measure = _popFromObject(specialMeasures);
+    const data = extraData[measure.name];
+    if (data) {
+      measure = Object.assign(measure, data);
+      delete extraData[measure.name];
+    }
     if (isDebugMode) console.log(`Chronos StoreSpecialMeasure ${measure.name}`);
     _store(measure);
   }
