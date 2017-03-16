@@ -30,6 +30,7 @@ const runningMeasureKeys = {};
 const runningMeasures = {};
 const measureTargetDurations = {}; // stores optional expected durations
 const extraData = {}; // stores optionals data, this are passed down to the store as individual fields
+let shouldAutoSave = true;
 let isDebugMode = false;
 let specialMeasures = {}; // thisis used to track measures that start from special markers (es. navigationStart)
 let storedMeasures = [];
@@ -93,6 +94,7 @@ const chronos = {
     // store extra data
     if (data) extraData[name] = data;
 
+    if (shouldAutoSave) this.saveToStore();
     return true;
   },
 
@@ -137,6 +139,7 @@ const chronos = {
     measure.duration = endTime - measure.startTime;
     storedMeasures[name] = measure;
 
+    if (shouldAutoSave) this.saveToStore();
     return true;
   },
 
@@ -144,8 +147,10 @@ const chronos = {
    * Setup the Store to save measures into
    * @param  {function} method
    */
-  setStoreMethod(method) {
-    storingMethod = method;
+  setup({ store, autoSave = true, debug = false}) {
+    storingMethod = store;
+    shouldAutoSave = autoSave;
+    if (debug) this.setDebugMode(debug);
   },
 
   // send all metrics to the provided store
