@@ -130,6 +130,7 @@ const chronos = {
     if (SUPPORTS_TIMING) {
       storedMeasures.push(name);
       window.performance.mark(`${name}_end`);
+      if (shouldAutoSave) this.saveToStore();
       return true;
     }
 
