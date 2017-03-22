@@ -212,7 +212,7 @@ function _store(data) {
   }
 }
 
-// Process User Timing metrics and send those over to Buffer Metrics
+// Process User Timing metrics and send those over to the given store
 function _processAndSendTimingMeasures (deadline) {
   _isRequestIdleCallbackScheduled = false;
 
@@ -251,7 +251,7 @@ function _processAndSendTimingMeasures (deadline) {
   }
 }
 
-// Process manually created measures and send those over to Buffer Metrics
+// Process manually created measures and send those over to the given store
 function _processAndSendMeasures (deadline) {
   _isRequestIdleCallbackScheduled = false;
 
