@@ -25,7 +25,7 @@ const ERROR_MISSING_STORE = 'Missing storing method';
 const SUPPORTS_NOW = window.performance && window.performance.now;
 const SUPPORTS_TIMING = window.performance && window.performance.mark;
 let NAVIGATION_START = 0;
-if (typeof window.performance.timing === 'object') {
+if (SUPPORTS_NOW && typeof window.performance.timing === 'object') {
   NAVIGATION_START = window.performance.timing.navigationStart;
 }
 
