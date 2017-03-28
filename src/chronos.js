@@ -22,25 +22,18 @@ window.cancelIdleCallback =
   };
 
 const ERROR_MISSING_STORE = 'Missing storing method';
-const SUPPORTS_NOW = window.performance && window.performance.now;
-const SUPPORTS_TIMING = window.performance && window.performance.mark;
-let NAVIGATION_START = 0;
-if (SUPPORTS_NOW && typeof window.performance.timing === 'object') {
-  NAVIGATION_START = window.performance.timing.navigationStart;
-}
-
+const extraData = {}; // stores optionals data, this are passed down to the store as individual fields
+const measureTargetDurations = {}; // stores optional expected durations
 const runningMeasureKeys = {};
 const runningMeasures = {};
-const measureTargetDurations = {}; // stores optional expected durations
-const extraData = {}; // stores optionals data, this are passed down to the store as individual fields
+
+let performance, storingMethod, supportsNow, supportsTiming, navigationStart;
+let supportPerformance = false;
 let shouldAutoSave = true;
 let isDebugMode = false;
 let specialMeasures = {}; // thisis used to track measures that start from special markers (es. navigationStart)
 let storedMeasures = [];
-// stopMetric will deal with Now measures in a different way compared to Timing measures
-if (!SUPPORTS_TIMING) storedMeasures = {};
 // this is the method used to save the store must be set with chronos.setStoreMethod
-let storingMethod;
 let _isRequestIdleCallbackScheduled = false;
 
 const chronos = {
@@ -53,17 +46,17 @@ const chronos = {
     if (typeof arguments[0] === 'string') name = arguments[0];
     if (isDebugMode) console.log(`Chronos startMeasure ${name}`);
 
-    if (!SUPPORTS_NOW) return false; // Silently fail if high resolution timing is not supported
+    if (!supportPerformance || !supportsNow) return false; // Silently fail if high resolution timing is not supported
     runningMeasureKeys[name] = name;
     if (data) extraData[name] = data;
 
-    if (SUPPORTS_TIMING) {
-      window.performance.mark(`${name}_start`);
+    if (supportsTiming) {
+      performance.mark(`${name}_start`);
       return true;
     }
 
     // fallback if User Timing API is not supported
-    const startTime = window.performance.now();
+    const startTime = performance.now();
     runningMeasures[name] = { name, startTime };
 
 
@@ -79,18 +72,18 @@ const chronos = {
   measureFromSpecialEvent({ name, eventName, data = false }) {
     if (!eventName) return false;
     if (isDebugMode) console.log(`Chronos measureFromSpecialEvent ${name}`);
-    if (!SUPPORTS_NOW) return false; // Silently fail if high resolution timing is not supported
+    if (!supportPerformance || !supportsNow) return false; // Silently fail if high resolution timing is not supported
 
-    const startTime = window.performance.timing[eventName];
+    const startTime = performance.timing[eventName];
     if (!startTime) return false;
-    const timeFromNavigationStart = startTime - NAVIGATION_START;
-    const duration = window.performance.now() - timeFromNavigationStart;
+    const timeFromNavigationStart = startTime - navigationStart;
+    const duration = performance.now() - timeFromNavigationStart;
     const measure = {
       duration,
       event_name: eventName,
       name,
-      navigation_start: NAVIGATION_START,
-      start_time: NAVIGATION_START - startTime
+      navigationStart: navigationStart,
+      start_time: navigationStart - startTime
     };
     specialMeasures[name] = measure;
 
@@ -108,7 +101,7 @@ const chronos = {
   **/
   measureFromNavigationStart({ name, data = false }) {
     if (typeof arguments[0] === 'string') name = arguments[0];
-    if (!SUPPORTS_NOW) return false; // Silently fail if high resolution timing is not supported
+    if (!supportPerformance || !supportsNow) return false; // Silently fail if high resolution timing is not supported
 
     if (isDebugMode) console.log(`Chronos measureFromNavigationStart ${name}`);
     this.measureFromSpecialEvent({
@@ -125,36 +118,26 @@ const chronos = {
    * @param  {string} name
    */
   stopMeasure(name) {
-    if (!SUPPORTS_NOW) return false; // Silently fail if high resolution timing is not supported
+    if (!supportPerformance || !supportsNow) return false; // Silently fail if high resolution timing is not supported
     if (!runningMeasureKeys[name]) return false; // To ease usage we do not throw an error in this case
     delete runningMeasureKeys[name];
 
     if (isDebugMode) console.log(`Chronos stopMeasure ${name}`);
-    if (SUPPORTS_TIMING) {
+    if (supportsTiming) {
       storedMeasures.push(name);
-      window.performance.mark(`${name}_end`);
+      performance.mark(`${name}_end`);
       if (shouldAutoSave) this.saveToStore();
       return true;
     }
 
     // fallback if User Timing API is not supported
-    const endTime = window.performance.now();
+    const endTime = performance.now();
     const measure = runningMeasures[name];
     measure.duration = endTime - measure.startTime;
     storedMeasures[name] = measure;
 
     if (shouldAutoSave) this.saveToStore();
     return true;
-  },
-
-  /**
-   * Setup the Store to save measures into
-   * @param  {function} method
-   */
-  setup({ store, autoSave = true, debug = false}) {
-    storingMethod = store;
-    shouldAutoSave = autoSave;
-    if (debug) this.setDebugMode(debug);
   },
 
   // send all metrics to the provided store
@@ -225,7 +208,7 @@ function _processAndSendTimingMeasures (deadline) {
     let measure = {
       duration: m.duration,
       name: m.name,
-      navigation_start: NAVIGATION_START,
+      navigationStart: navigationStart,
       start_time: m.startTime
     };
     const data = extraData[measure.name];
@@ -239,8 +222,8 @@ function _processAndSendTimingMeasures (deadline) {
 
   while (deadline.timeRemaining() > 0 && storedMeasures.length > 0) {
     const metricName = _popCompletedMetric();
-    window.performance.measure(metricName, `${metricName}_start`, `${metricName}_end`);
-    const metrics = window.performance.getEntriesByName(metricName);
+    performance.measure(metricName, `${metricName}_start`, `${metricName}_end`);
+    const metrics = performance.getEntriesByName(metricName);
     metrics.forEach(storeTimingMeasure);
   }
 
@@ -250,8 +233,8 @@ function _processAndSendTimingMeasures (deadline) {
     _processAndSendMetrics();
   } else if(Object.keys(runningMeasureKeys).length === 0 && storedMeasures.length === 0) {
     if (isDebugMode) console.log(`Chronos cleanup marks and measures`);
-    window.performance.clearMarks();
-    window.performance.clearMeasures();
+    performance.clearMarks();
+    performance.clearMeasures();
   }
 }
 
@@ -264,7 +247,7 @@ function _processAndSendMeasures (deadline) {
     let measure = {
       duration: measureData.duration,
       name: measureData.name,
-      navigation_start: NAVIGATION_START,
+      navigationStart: navigationStart,
       start_time: measureData.startTime,
     };
     const data = extraData[measure.name];
@@ -302,11 +285,33 @@ function _processAndSendMetrics () {
   if (_isRequestIdleCallbackScheduled) return;
   _isRequestIdleCallbackScheduled = true;
 
-  if (SUPPORTS_TIMING) {
+  if (supportsTiming) {
     window.requestIdleCallback(_processAndSendTimingMeasures, { timeout: 2000 });
   } else {
     window.requestIdleCallback(_processAndSendMeasures, { timeout: 2000 });
   }
 }
 
-export default chronos;
+function _setup (options = { autoSave, debug, performance, store }) {
+  storingMethod = options.store
+  isDebugMode = options.debug || false
+  shouldAutoSave = options.autoSave ||
+    typeof storingMethod === 'undefined' ? false : true
+  performance = options.performance || window.performance
+
+  supportPerformance = typeof performance !== 'undefined'
+  supportsNow = Boolean( performance && performance.now )
+  supportsTiming = Boolean( supportsNow && performance.mark )
+
+  navigationStart = 0;
+  if (supportPerformance  && performance.timing) {
+      navigationStart = performance.timing.navigationStart
+  }
+  // stopMetric will deal with Now measures in a different way compared to Timing measures
+  storedMeasures = !supportsTiming ? {} : []
+}
+
+export default (options) => {
+  _setup(options)
+  return chronos
+}
