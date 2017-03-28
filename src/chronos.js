@@ -308,7 +308,7 @@ function _setup (options = { autoSave, debug, performance, store }) {
       navigationStart = performance.timing.navigationStart
   }
   // stopMetric will deal with Now measures in a different way compared to Timing measures
-  if (!supportsTiming) storedMeasures = {};
+  storedMeasures = !supportsTiming ? {} : []
 }
 
 export default (options) => {
