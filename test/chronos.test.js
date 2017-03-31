@@ -5,8 +5,25 @@ let ch
 
 beforeEach(() => {
   performance = {
-    mark() { return true },
-    now() { return true },
+    now: jest.fn().mockImplementation( () => {
+      return Date.now()
+    }),
+    mark: jest.fn().mockImplementation( name => {
+      return true
+    }),
+    measure: jest.fn().mockImplementation( ({ name, start, end }) => {
+      return true
+    }),
+    getEntriesByName: jest.fn().mockImplementation( name => {
+      return [{
+        duration : 4392.679999999702,
+        entryType : "measure",
+        name : "foo",
+        startTime : 8396525.785
+      }]
+    }),
+    clearMeasures: jest.fn(),
+    clearMarks: jest.fn(),
     timing: {
       navigationStart: Date.now()
     }
@@ -18,7 +35,6 @@ describe('High Resolution Time Unsupported', () => {
     performance.now = undefined
     ch = chronos({
       performance,
-      autosave: false
     })
     ch.setDebugMode(false)
   })
@@ -40,18 +56,32 @@ describe('High Resolution Time Unsupported', () => {
   })
 })
 
+describe('start measure', () => {
+  beforeEach(() => {
+    performance.mark = undefined
+    ch = chronos({
+      performance,
+    })
+    ch.setDebugMode(false)
+  })
+
+  test('starting multiple measures with the same name should override the previos one', () => {
+    expect(ch.startMeasure('foo')).toBe(true)
+    expect(ch.startMeasure('foo')).toBe(true)
+    expect(performance.now).toHaveBeenCalledTimes(2)
+    ch.setDebugMode(true)
+    expect(ch._runningMeasures).toHaveProperty('foo')
+  })
+
+})
+
 describe('User Timing API Unsupported', () => {
   beforeEach(() => {
     performance.mark = undefined
     ch = chronos({
       performance,
-      autosave: false
     })
     ch.setDebugMode(false)
-
-    performance.now = jest.fn().mockImplementation( () => {
-      return Date.now()
-    })
   })
   
   test('start measure', () => {
@@ -76,12 +106,8 @@ describe('User Timing API Unsupported', () => {
 
 describe('User Timing API Supported', () => {
   beforeEach(() => {
-    performance.mark = jest.fn().mockImplementation( name => {
-      return true
-    })
     ch = chronos({
       performance,
-      autosave: false
     })
     ch.setDebugMode(false)
   })
@@ -90,6 +116,7 @@ describe('User Timing API Supported', () => {
     expect(ch.startMeasure('foo')).toBe(true)
     expect(performance.mark).toHaveBeenCalledTimes(1)
   })
+
   test('stop measure', () => {
     expect(ch.stopMeasure('foo')).toBe(true)
     expect(performance.mark).toHaveBeenCalledTimes(1)
@@ -98,16 +125,33 @@ describe('User Timing API Supported', () => {
   })
 })
 
+describe('processing and save', () => {
+  beforeEach(() => {
+    ch = chronos({})
+  })
+  
+  test("should throw an error if it's missing a storing method", () => {
+    expect(ch.saveToStore).toThrow()
+  })
+})
 
-describe('processing and save | with Timing', () => {
-  test("should throw an error if it's missing a storing method")
-  test('on autosave it should try to store the measures on stop')
+describe('processing and save | Timing', () => {
+  test('it should store on stop if a store is set', () => {
+    ch.saveToStore = jest.fn()
+    ch = chronos({
+      performance,
+      store: jest.fn()
+    })
+    expect(ch.startMeasure('foo')).toBe(true)
+    expect(ch.stopMeasure('foo')).toBe(true)
+    expect(ch.saveToStore).toHaveBeenCalledTimes(1)
+  })
+
   test('it should store all the measures')
 })
 
-describe('processing and save | with Now', () => {
-  test("should throw an error if it's missing a storing method")
-  test('on autosave it should try to store the measures on stop')
+describe('processing and save | Now', () => {
+  test('it should store on stop')
   test('it should store all the measures')
 })
 
