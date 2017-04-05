@@ -1,3 +1,5 @@
+/* globals jest describe test beforeEach expect */
+
 import chronos from '../src/chronos'
 
 let performance = {}
@@ -16,10 +18,10 @@ beforeEach(() => {
     }),
     getEntriesByName: jest.fn().mockImplementation( name => {
       return [{
-        duration : 4392.679999999702,
-        entryType : "measure",
-        name : "foo",
-        startTime : 8396525.785
+        duration: 4392.679999999702,
+        entryType: 'measure',
+        name: name,
+        startTime: 8396525.785
       }]
     }),
     clearMeasures: jest.fn(),
@@ -106,9 +108,7 @@ describe('User Timing API Unsupported', () => {
 
 describe('User Timing API Supported', () => {
   beforeEach(() => {
-    ch = chronos({
-      performance,
-    })
+    ch = chronos({ performance })
     ch.setDebugMode(false)
   })
 
@@ -160,4 +160,37 @@ describe('Measure from Timing events', () => {
   test('should measure from an existing timing event')
   test('should measure from navigationStart')
   test('on autosave it should try to store the measures on stop')
+})
+
+describe('Extra Data | Global', () => {
+  test('extraData provide on start method should deeply merge with teh global one')
+})
+
+describe('Global Extra Data', () => {
+  const extraData = { tags: ['foo:bar'] }
+
+  beforeEach(() => {
+    ch = chronos({
+      performance,
+      extraData,
+      debug: true
+    })
+  })
+
+  test('should be possible to provide global extraData on setup', () => {
+    expect(ch._extraData.global).toBe(extraData)
+  })
+  test('global and measure specific Array extraData shoould be merged together', () => {
+    ch.startMeasure({
+      name: 'foo',
+      data: {
+        tags: ['bar:foobar'],
+        foo: 'foo'
+      }
+    })
+    expect(ch._extraData.foo).toMatchObject({
+      tags: ['foo:bar', 'bar:foobar'],
+      foo: 'foo'
+    })
+  })
 })

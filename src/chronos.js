@@ -22,7 +22,7 @@ window.cancelIdleCallback =
   };
 
 const ERROR_MISSING_STORE = 'Missing storing method';
-const extraData = {}; // stores optionals data, this are passed down to the store as individual fields
+const extraData = { global: {} }; // stores optionals data, this are passed down to the store as individual fields
 const measureTargetDurations = {}; // stores optional expected durations
 const runningMeasureKeys = {};
 const runningMeasures = {};
@@ -48,7 +48,7 @@ const chronos = {
 
     if (!supportPerformance || !supportsNow) return false; // Silently fail if high resolution timing is not supported
     runningMeasureKeys[name] = name;
-    if (data) extraData[name] = data;
+    if (data) _storeExtraData(name, data)
 
     if (supportsTiming) {
       performance.mark(`${name}_start`);
@@ -88,7 +88,7 @@ const chronos = {
     specialMeasures[name] = measure;
 
     // store extra data
-    if (data) extraData[name] = data;
+    if (data) _storeExtraData(name, data)
 
     if (shouldAutoSave) this.saveToStore();
     return true;
@@ -172,6 +172,21 @@ const chronos = {
     }
   }
 };
+
+function _storeExtraData (name, data) {
+  let measureData = extraData.global
+
+  let keys = Object.keys(data)
+  keys.forEach((key) => {
+    let value = data[key]
+    if (typeof value.push === 'function' && measureData[key]) {
+      value = measureData[key].concat(value)
+    }
+    measureData[key] = value
+  })
+
+  extraData[name] = measureData
+}
 
 function _popFromObject (obj) {
     const key = Object.keys(obj).pop();
@@ -292,7 +307,7 @@ function _processAndSendMetrics () {
   }
 }
 
-function _setup (options = { autoSave, debug, performance, store }) {
+function _setup (options = { autoSave, debug, performance, store, extraData }) {
   storingMethod = options.store
   isDebugMode = options.debug || false
   shouldAutoSave = options.autoSave ||
@@ -309,6 +324,9 @@ function _setup (options = { autoSave, debug, performance, store }) {
   }
   // stopMetric will deal with Now measures in a different way compared to Timing measures
   storedMeasures = !supportsTiming ? {} : []
+
+  if (options.extraData) extraData.global = options.extraData
+  if(isDebugMode) chronos.setDebugMode(isDebugMode)
 }
 
 export default (options) => {
