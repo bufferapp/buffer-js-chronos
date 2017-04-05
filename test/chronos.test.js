@@ -7,16 +7,16 @@ let ch
 
 beforeEach(() => {
   performance = {
-    now: jest.fn().mockImplementation( () => {
+    now: jest.fn().mockImplementation(() => {
       return Date.now()
     }),
-    mark: jest.fn().mockImplementation( name => {
+    mark: jest.fn().mockImplementation(name => {
       return true
     }),
-    measure: jest.fn().mockImplementation( ({ name, start, end }) => {
+    measure: jest.fn().mockImplementation(({ name, start, end }) => {
       return true
     }),
-    getEntriesByName: jest.fn().mockImplementation( name => {
+    getEntriesByName: jest.fn().mockImplementation(name => {
       return [{
         duration: 4392.679999999702,
         entryType: 'measure',
@@ -36,7 +36,7 @@ describe('High Resolution Time Unsupported', () => {
   beforeEach(() => {
     performance.now = undefined
     ch = chronos({
-      performance,
+      performance
     })
     ch.setDebugMode(false)
   })
@@ -62,7 +62,7 @@ describe('start measure', () => {
   beforeEach(() => {
     performance.mark = undefined
     ch = chronos({
-      performance,
+      performance
     })
     ch.setDebugMode(false)
   })
@@ -74,18 +74,17 @@ describe('start measure', () => {
     ch.setDebugMode(true)
     expect(ch._runningMeasures).toHaveProperty('foo')
   })
-
 })
 
 describe('User Timing API Unsupported', () => {
   beforeEach(() => {
     performance.mark = undefined
     ch = chronos({
-      performance,
+      performance
     })
     ch.setDebugMode(false)
   })
-  
+
   test('start measure', () => {
     expect(ch.startMeasure('foo')).toBe(true)
     expect(performance.now).toHaveBeenCalledTimes(1)
@@ -129,7 +128,7 @@ describe('processing and save', () => {
   beforeEach(() => {
     ch = chronos({})
   })
-  
+
   test("should throw an error if it's missing a storing method", () => {
     expect(ch.saveToStore).toThrow()
   })
