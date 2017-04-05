@@ -179,6 +179,8 @@ function _storeExtraData (name, data) {
     let value = data[key]
     if (typeof value.push === 'function' && measureData[key]) {
       value = measureData[key].concat(value)
+      // remove duplicates
+      value = [...new Set(value)]
     }
     measureData[key] = value
   })
@@ -308,7 +310,7 @@ function _processAndSendMetrics () {
  * @param  {boolean} autoSave
  * @param  {boolean} debug
  * @param  {function} store
- * @param  {object} extraData
+ * @param  {object} data
  * @param  {object} performance
  */
 function _setup (options = {}) {
@@ -328,7 +330,7 @@ function _setup (options = {}) {
   // stopMetric will deal with Now measures in a different way compared to Timing measures
   storedMeasures = !supportsTiming ? {} : []
 
-  if (options.extraData) extraData.global = options.extraData
+  if (options.data) extraData.global = options.data
   chronos.setDebugMode(isDebugMode)
 }
 

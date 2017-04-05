@@ -161,25 +161,23 @@ describe('Measure from Timing events', () => {
   test('on autosave it should try to store the measures on stop')
 })
 
-describe('Extra Data | Global', () => {
-  test('extraData provide on start method should deeply merge with teh global one')
-})
-
 describe('Global Extra Data', () => {
-  const extraData = { tags: ['foo:bar'] }
+  let data = { tags: ['foo:bar'] }
 
   beforeEach(() => {
+    data = { tags: ['foo:bar'] }
     ch = chronos({
       performance,
-      extraData,
+      data,
       debug: true
     })
   })
 
   test('should be possible to provide global extraData on setup', () => {
-    expect(ch._extraData.global).toBe(extraData)
+    expect(ch._extraData.global).toBe(data)
   })
-  test('global and measure specific Array extraData shoould be merged together', () => {
+
+  test('global and measure specific Array data should be merged together', () => {
     ch.startMeasure({
       name: 'foo',
       data: {
@@ -190,6 +188,18 @@ describe('Global Extra Data', () => {
     expect(ch._extraData.foo).toMatchObject({
       tags: ['foo:bar', 'bar:foobar'],
       foo: 'foo'
+    })
+  })
+
+  test('merged arrays should not have duplicates', () => {
+    ch.startMeasure({
+      name: 'foo',
+      data: {
+        tags: ['bar:foobar', 'foo:bar']
+      }
+    })
+    expect(ch._extraData.foo).toMatchObject({
+      tags: ['foo:bar', 'bar:foobar']
     })
   })
 })
