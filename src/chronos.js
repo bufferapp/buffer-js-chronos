@@ -178,9 +178,13 @@ function _storeExtraData (name, data) {
   keys.forEach((key) => {
     let value = data[key]
     if (typeof value.push === 'function' && measureData[key]) {
+      const cleanValues = []
+      const hash = {}
       value = measureData[key].concat(value)
       // remove duplicates
-      value = [...new Set(value)]
+      value.forEach((v) => { if (!hash[v]) hash[v] = v })
+      for (const v in hash) { cleanValues.push(v) }
+      value = cleanValues
     }
     measureData[key] = value
   })
