@@ -162,10 +162,9 @@ describe('Measure from Timing events', () => {
 })
 
 describe('Global Extra Data', () => {
-  let data = { tags: ['foo:bar'] }
+  const data = { tags: ['bar:bar'] }
 
   beforeEach(() => {
-    data = { tags: ['foo:bar'] }
     ch = chronos({
       performance,
       data,
@@ -186,7 +185,7 @@ describe('Global Extra Data', () => {
       }
     })
     expect(ch._extraData.foo).toMatchObject({
-      tags: ['foo:bar', 'bar:foobar'],
+      tags: ['bar:foobar', 'bar:bar'],
       foo: 'foo'
     })
   })
@@ -195,11 +194,23 @@ describe('Global Extra Data', () => {
     ch.startMeasure({
       name: 'foo',
       data: {
-        tags: ['bar:foobar', 'foo:bar']
+        tags: ['bar:foobar', 'foo:bar', 'bar:bar']
       }
     })
     expect(ch._extraData.foo).toMatchObject({
-      tags: ['foo:bar', 'bar:foobar']
+      tags: ['bar:foobar', 'foo:bar', 'bar:bar']
+    })
+  })
+
+  test('global extraData should not be mudated when mergin extraData', () => {
+    ch.startMeasure({
+      name: 'foo',
+      data: {
+        tags: ['bar:foobar', 'foo:bar']
+      }
+    })
+    expect(ch._extraData.global).toMatchObject({
+      tags: ['bar:bar']
     })
   })
 })

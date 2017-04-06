@@ -172,20 +172,22 @@ const chronos = {
 }
 
 function _storeExtraData (name, data) {
-  let measureData = extraData.global
+  let measureData = {}
 
   let keys = Object.keys(data)
   keys.forEach((key) => {
     let value = data[key]
-    if (typeof value.push === 'function' && measureData[key]) {
+
+    if (typeof value.push === 'function' && extraData.global[key]) {
+      value = value.concat(extraData.global[key])
+      // remove duplicates
       const cleanValues = []
       const hash = {}
-      value = measureData[key].concat(value)
-      // remove duplicates
       value.forEach((v) => { if (!hash[v]) hash[v] = v })
       for (const v in hash) { cleanValues.push(v) }
       value = cleanValues
     }
+
     measureData[key] = value
   })
 
