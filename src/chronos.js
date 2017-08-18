@@ -1,140 +1,101 @@
 /* globals window */
 
-// Shim requestIdleCallback [source](https://developers.google.com/web/updates/2015/08/using-requestidlecallback)
-window.requestIdleCallback =
-  window.requestIdleCallback ||
-  function (cb) {
-    var start = Date.now()
-    return setTimeout(() => {
-      cb({
-        didTimeout: false,
-        timeRemaining () {
-          return Math.max(0, 50 - (Date.now() - start))
-        }
-      })
-    }, 1)
-  }
+const ERROR_MISSING_STORE = 'Missing storing method';
+// stores optionals data, this are passed down to the store as individual fields
+const extraData = { global: {} };
+const runningMeasureKeys = {};
+const runningMeasures = {};
 
-window.cancelIdleCallback =
-  window.cancelIdleCallback ||
-  function (id) {
-    clearTimeout(id)
-  }
-
-// Object.assign polyfill
-if (typeof Object.assign != 'function') {
-  Object.assign = function(target, varArgs) { // .length of function is 2
-    'use strict';
-    if (target == null) { // TypeError if undefined or null
-      throw new TypeError('Cannot convert undefined or null to object');
-    }
-
-    var to = Object(target);
-
-    for (var index = 1; index < arguments.length; index++) {
-      var nextSource = arguments[index];
-
-      if (nextSource != null) { // Skip over if undefined or null
-        for (var nextKey in nextSource) {
-          // Avoid bugs when hasOwnProperty is shadowed
-          if (Object.prototype.hasOwnProperty.call(nextSource, nextKey)) {
-            to[nextKey] = nextSource[nextKey];
-          }
-        }
-      }
-    }
-    return to;
-  };
-}
-
-const ERROR_MISSING_STORE = 'Missing storing method'
-const extraData = { global: {} } // stores optionals data, this are passed down to the store as individual fields
-const runningMeasureKeys = {}
-const runningMeasures = {}
-
-let performance, storingMethod, supportsNow, supportsTiming, navigationStart
-let supportPerformance = false
-let shouldAutoSave = true
-let isDebugMode = false
-let specialMeasures = {} // thisis used to track measures that start from special markers (es. navigationStart)
-let storedMeasures = []
+let performance;
+let storingMethod;
+let supportsNow;
+let supportsTiming;
+let navigationStart;
+let supportPerformance = false;
+let shouldAutoSave = true;
+let isDebugMode = false;
+// this is used to track measures that start from special markers (es. navigationStart)
+const specialMeasures = {};
+let storedMeasures = [];
 // this is the method used to save the store must be set with chronos.setStoreMethod
-let _isRequestIdleCallbackScheduled = false
+let _isRequestIdleCallbackScheduled = false;
 
 const chronos = {
-  /**
+  /*
    * Start a new measure with the provided name
    * @param  name String
    * @param  data Object, any additional data you whish to store with the measure
-  **/
-  startMeasure ({ name, data = false }) {
-    if (typeof arguments[0] === 'string') name = arguments[0]
-    if (isDebugMode) console.log(`Chronos startMeasure ${name}`)
+  */
+  startMeasure (name, data) {
+    if (isDebugMode) console.log(`Chronos startMeasure ${name}`);
 
-    if (!supportPerformance || !supportsNow) return false // Silently fail if high resolution timing is not supported
-    runningMeasureKeys[name] = name
-    if (data) _storeExtraData(name, data)
+    // Silently fail if high resolution timing is not supported
+    if (!supportPerformance || !supportsNow) return false;
+    runningMeasureKeys[name] = name;
+
+    if (data) _storeExtraData(name, data);
 
     if (supportsTiming) {
-      performance.mark(`${name}_start`)
-      return true
+      performance.mark(`${name}_start`);
+      return true;
     }
 
     // fallback if User Timing API is not supported
-    const startTime = performance.now()
-    runningMeasures[name] = { name, startTime }
+    const startTime = performance.now();
+    runningMeasures[name] = { name, startTime };
 
-    return true
+    return true;
   },
 
-  /**
+  /*
    * Create a new measure starting from an existing performance event
    * @param  name String
    * @param  eventName String
    * @param  data Object, any additional data you whish to store with the measure
-  **/
-  measureFromSpecialEvent ({ name, eventName, data = false }) {
-    if (!eventName) return false
-    if (isDebugMode) console.log(`Chronos measureFromSpecialEvent ${name}`)
-    if (!supportPerformance || !supportsNow) return false // Silently fail if high resolution timing is not supported
+  */
+  measureFromSpecialEvent (name, eventName, data) {
+    if (!eventName) return false;
+    if (isDebugMode) console.log(`Chronos measureFromSpecialEvent ${name}`);
+    // Silently fail if high resolution timing is not supported
+    if (!supportPerformance || !supportsNow) return false;
 
-    const startTime = performance.timing[eventName]
-    if (!startTime) return false
-    const timeFromNavigationStart = startTime - navigationStart
-    const duration = performance.now() - timeFromNavigationStart
+    const startTime = performance.timing[eventName];
+    if (!startTime) return false;
+    const timeFromNavigationStart = startTime - navigationStart;
+    const duration = performance.now() - timeFromNavigationStart;
     const measure = {
       duration,
       event_name: eventName,
       name,
-      navigationStart: navigationStart,
-      start_time: navigationStart - startTime
-    }
-    specialMeasures[name] = measure
+      navigationStart,
+      start_time: navigationStart - startTime,
+    };
+    specialMeasures[name] = measure;
 
     // store extra data
-    if (data) _storeExtraData(name, data)
+    if (data) _storeExtraData(name, data);
 
-    if (shouldAutoSave) this.saveToStore()
-    return true
+    if (shouldAutoSave) this.saveToStore();
+    return true;
   },
 
-  /**
+  /*
    * Create a new measure starting from the NavigationStart event
    * @param  name String
    * @param  data Object, any additional data you whish to store with the measure
-  **/
-  measureFromNavigationStart ({ name, data = false }) {
-    if (typeof arguments[0] === 'string') name = arguments[0]
-    if (!supportPerformance || !supportsNow) return false // Silently fail if high resolution timing is not supported
+  */
+  measureFromNavigationStart (name, data) {
+    // Silently fail if high resolution timing is not supported
+    if (!supportPerformance || !supportsNow) return false;
 
-    if (isDebugMode) console.log(`Chronos measureFromNavigationStart ${name}`)
+    if (isDebugMode) console.log(`Chronos measureFromNavigationStart ${name}`);
     this.measureFromSpecialEvent({
       name,
       eventName: 'navigationStart',
-      data
-    })
+      data,
+    });
 
-    return true
+    return true;
   },
 
   /**
@@ -142,26 +103,28 @@ const chronos = {
    * @param  {string} name
    */
   stopMeasure (name) {
-    if (!supportPerformance || !supportsNow) return false // Silently fail if high resolution timing is not supported
-    if (!runningMeasureKeys[name]) return false // To ease usage we do not throw an error in this case
-    delete runningMeasureKeys[name]
+    // Silently fail if high resolution timing is not supported
+    if (!supportPerformance || !supportsNow) return false;
+    // To ease usage we do not throw an error in this case
+    if (!runningMeasureKeys[name]) return false;
+    delete runningMeasureKeys[name];
 
-    if (isDebugMode) console.log(`Chronos stopMeasure ${name}`)
+    if (isDebugMode) console.log(`Chronos stopMeasure ${name}`);
     if (supportsTiming) {
-      storedMeasures.push(name)
-      performance.mark(`${name}_end`)
-      if (shouldAutoSave) this.saveToStore()
-      return true
+      storedMeasures.push(name);
+      performance.mark(`${name}_end`);
+      if (shouldAutoSave) this.saveToStore();
+      return true;
     }
 
     // fallback if User Timing API is not supported
-    const endTime = performance.now()
-    const measure = runningMeasures[name]
-    measure.duration = endTime - measure.startTime
-    storedMeasures[name] = measure
+    const endTime = performance.now();
+    const measure = runningMeasures[name];
+    measure.duration = endTime - measure.startTime;
+    storedMeasures[name] = measure;
 
-    if (shouldAutoSave) this.saveToStore()
-    return true
+    if (shouldAutoSave) this.saveToStore();
+    return true;
   },
 
   // send all metrics to the provided store
@@ -169,9 +132,9 @@ const chronos = {
     // as this process will delete data when saving it to a store
     // we interup it at this stage to avoid losing data if a strore isn't set
     if (typeof storingMethod === 'function') {
-      _processAndSendMetrics()
+      _processAndSendMetrics();
     } else {
-      throw new Error(ERROR_MISSING_STORE)
+      throw new Error(ERROR_MISSING_STORE);
     }
   },
 
@@ -180,161 +143,161 @@ const chronos = {
    * @param  {boolean} status
    */
   setDebugMode (status) {
-    isDebugMode = status
+    isDebugMode = status;
     if (isDebugMode) {
-      this._runningMeasureKeys = runningMeasureKeys
-      this._runningMeasures = runningMeasures
-      this._specialMeasures = specialMeasures
-      this._storedMeasures = storedMeasures
-      this._extraData = extraData
+      this._runningMeasureKeys = runningMeasureKeys;
+      this._runningMeasures = runningMeasures;
+      this._specialMeasures = specialMeasures;
+      this._storedMeasures = storedMeasures;
+      this._extraData = extraData;
     } else {
-      delete this._runningMeasureKeys
-      delete this._runningMeasures
-      delete this._specialMeasures
-      delete this._storedMeasures
-      delete this._extraData
+      delete this._runningMeasureKeys;
+      delete this._runningMeasures;
+      delete this._specialMeasures;
+      delete this._storedMeasures;
+      delete this._extraData;
     }
-  }
-}
+  },
+};
 
 function _storeExtraData (name, data) {
-  let measureData = {}
+  const measureData = {};
 
-  let keys = Object.keys(data)
+  const keys = Object.keys(data);
   keys.forEach((key) => {
-    let value = data[key]
+    let value = data[key];
 
     if (typeof value.push === 'function' && extraData.global[key]) {
-      value = value.concat(extraData.global[key])
+      value = value.concat(extraData.global[key]);
       // remove duplicates
-      const cleanValues = []
-      const hash = {}
-      value.forEach((v) => { if (!hash[v]) hash[v] = v })
-      for (const v in hash) { cleanValues.push(v) }
-      value = cleanValues
+      const cleanValues = [];
+      const hash = {};
+      value.forEach((v) => { if (!hash[v]) hash[v] = v; });
+      for (const v in hash) { cleanValues.push(v); }
+      value = cleanValues;
     }
 
-    measureData[key] = value
-  })
+    measureData[key] = value;
+  });
 
-  extraData[name] = measureData
+  extraData[name] = measureData;
 }
 
 function _popFromObject (obj) {
-  const key = Object.keys(obj).pop()
-  let measure = obj[key]
-  delete obj[key]
-  return measure
+  const key = Object.keys(obj).pop();
+  const measure = obj[key];
+  delete obj[key];
+  return measure;
 }
 
 // some private methods
 function _popCompletedMetric () {
-  let measure
+  let measure;
   if (typeof storedMeasures.pop === 'function') {
-    measure = storedMeasures.pop()
+    measure = storedMeasures.pop();
   } else {
-    measure = _popFromObject(storedMeasures)
+    measure = _popFromObject(storedMeasures);
   }
-  return measure
+  return measure;
 }
 
 function _store (data) {
   if (typeof storingMethod === 'function') {
-    storingMethod(data)
+    storingMethod(data);
   } else {
-    throw new Error(ERROR_MISSING_STORE)
+    throw new Error(ERROR_MISSING_STORE);
   }
 }
 
 // Process User Timing metrics and send those over to the given store
 function _processAndSendTimingMeasures (deadline) {
-  _isRequestIdleCallbackScheduled = false
+  _isRequestIdleCallbackScheduled = false;
 
   const storeTimingMeasure = (m) => {
     // No need to store the entryType
     let measure = {
       duration: m.duration,
       name: m.name,
-      navigationStart: navigationStart,
-      start_time: m.startTime
-    }
-    const data = extraData[measure.name]
+      navigationStart,
+      start_time: m.startTime,
+    };
+    const data = extraData[measure.name];
     if (data) {
-      measure = Object.assign(measure, data)
-      delete extraData[measure.name]
+      measure = Object.assign(measure, data);
+      delete extraData[measure.name];
     }
-    if (isDebugMode) console.log(`Chronos StoreTimingMeasure ${m.name}`)
-    _store(measure)
-  }
+    if (isDebugMode) console.log(`Chronos StoreTimingMeasure ${m.name}`);
+    _store(measure);
+  };
 
   while (deadline.timeRemaining() > 0 && storedMeasures.length > 0) {
-    const metricName = _popCompletedMetric()
-    performance.measure(metricName, `${metricName}_start`, `${metricName}_end`)
-    const metrics = performance.getEntriesByName(metricName)
-    metrics.forEach(storeTimingMeasure)
+    const metricName = _popCompletedMetric();
+    performance.measure(metricName, `${metricName}_start`, `${metricName}_end`);
+    const metrics = performance.getEntriesByName(metricName);
+    metrics.forEach(storeTimingMeasure);
   }
 
-  _processAndSendSpecialMeasures(deadline)
+  _processAndSendSpecialMeasures(deadline);
 
   if (storedMeasures.length > 0 || Object.keys(specialMeasures).length > 0) {
-    _processAndSendMetrics()
+    _processAndSendMetrics();
   } else if (Object.keys(runningMeasureKeys).length === 0 && storedMeasures.length === 0) {
-    if (isDebugMode) console.log(`Chronos cleanup marks and measures`)
-    performance.clearMarks()
-    performance.clearMeasures()
+    if (isDebugMode) console.log(`Chronos cleanup marks and measures`);
+    performance.clearMarks();
+    performance.clearMeasures();
   }
 }
 
 // Process manually created measures and send those over to the given store
 function _processAndSendMeasures (deadline) {
-  _isRequestIdleCallbackScheduled = false
+  _isRequestIdleCallbackScheduled = false;
 
   while (deadline.timeRemaining() > 0 && Object.keys(storedMeasures).length > 0) {
-    const measureData = _popCompletedMetric()
+    const measureData = _popCompletedMetric();
     let measure = {
       duration: measureData.duration,
       name: measureData.name,
-      navigationStart: navigationStart,
-      start_time: measureData.startTime
-    }
-    const data = extraData[measure.name]
+      navigationStart,
+      start_time: measureData.startTime,
+    };
+    const data = extraData[measure.name];
     if (data) {
-      measure = Object.assign(measure, data)
-      delete extraData[measure.name]
+      measure = Object.assign(measure, data);
+      delete extraData[measure.name];
     }
-    if (isDebugMode) console.log(`Chronos StoreMeasure ${measure.name}`)
-    _store(measure)
+    if (isDebugMode) console.log(`Chronos StoreMeasure ${measure.name}`);
+    _store(measure);
   }
 
-  _processAndSendSpecialMeasures(deadline)
+  _processAndSendSpecialMeasures(deadline);
 
   if (Object.keys(storedMeasures).length > 0 || Object.keys(specialMeasures).length > 0) {
-    _processAndSendMetrics()
+    _processAndSendMetrics();
   }
 }
 
 // Process special measure, ex measureFromNavigationStart
 function _processAndSendSpecialMeasures (deadline) {
   while (deadline.timeRemaining() > 0 && Object.keys(specialMeasures).length > 0) {
-    let measure = _popFromObject(specialMeasures)
-    const data = extraData[measure.name]
+    let measure = _popFromObject(specialMeasures);
+    const data = extraData[measure.name];
     if (data) {
-      measure = Object.assign(measure, data)
-      delete extraData[measure.name]
+      measure = Object.assign(measure, data);
+      delete extraData[measure.name];
     }
-    if (isDebugMode) console.log(`Chronos StoreSpecialMeasure ${measure.name}`)
-    _store(measure)
+    if (isDebugMode) console.log(`Chronos StoreSpecialMeasure ${measure.name}`);
+    _store(measure);
   }
 }
 
 function _processAndSendMetrics () {
-  if (_isRequestIdleCallbackScheduled) return
-  _isRequestIdleCallbackScheduled = true
+  if (_isRequestIdleCallbackScheduled) return;
+  _isRequestIdleCallbackScheduled = true;
 
   if (supportsTiming) {
-    window.requestIdleCallback(_processAndSendTimingMeasures, { timeout: 2000 })
+    window.requestIdleCallback(_processAndSendTimingMeasures, { timeout: 2000 });
   } else {
-    window.requestIdleCallback(_processAndSendMeasures, { timeout: 2000 })
+    window.requestIdleCallback(_processAndSendMeasures, { timeout: 2000 });
   }
 }
 /**
@@ -346,27 +309,27 @@ function _processAndSendMetrics () {
  * @param  {object} performance
  */
 function _setup (options = {}) {
-  storingMethod = options.store
-  isDebugMode = options.debug || false
-  shouldAutoSave = options.autoSave || Boolean(typeof storingMethod !== 'undefined')
-  performance = options.performance || window.performance
+  storingMethod = options.store;
+  isDebugMode = options.debug || false;
+  shouldAutoSave = options.autoSave || Boolean(typeof storingMethod !== 'undefined');
+  performance = options.performance || window.performance;
 
-  supportPerformance = typeof performance !== 'undefined'
-  supportsNow = Boolean(performance && performance.now)
-  supportsTiming = Boolean(supportsNow && performance.mark)
+  supportPerformance = typeof performance !== 'undefined';
+  supportsNow = Boolean(performance && performance.now);
+  supportsTiming = Boolean(supportsNow && performance.mark);
 
-  navigationStart = 0
+  navigationStart = 0;
   if (supportPerformance && performance.timing) {
-    navigationStart = performance.timing.navigationStart
+    navigationStart = performance.timing.navigationStart;
   }
   // stopMetric will deal with Now measures in a different way compared to Timing measures
-  storedMeasures = !supportsTiming ? {} : []
+  storedMeasures = !supportsTiming ? {} : [];
 
-  if (options.data) extraData.global = options.data
-  chronos.setDebugMode(isDebugMode)
+  if (options.data) extraData.global = options.data;
+  chronos.setDebugMode(isDebugMode);
 }
 
 export default (options) => {
-  _setup(options)
-  return chronos
-}
+  _setup(options);
+  return chronos;
+};
