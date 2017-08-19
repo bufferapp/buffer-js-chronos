@@ -89,11 +89,11 @@ const chronos = {
     if (!supportPerformance || !supportsNow) return false;
 
     if (isDebugMode) console.log(`Chronos measureFromNavigationStart ${name}`);
-    this.measureFromSpecialEvent({
+    this.measureFromSpecialEvent(
       name,
-      eventName: 'navigationStart',
+      'navigationStart',
       data,
-    });
+    );
 
     return true;
   },
